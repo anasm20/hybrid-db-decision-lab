@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+.terraform/
+*.tfstate
+*.tfstate.*
+.DS_Store
+experiments/EXP-*/raw/*.log

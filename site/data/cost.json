@@ -1,0 +1,10 @@
+{
+  "provenance": "MODELLED",
+  "currency": "EUR",
+  "monthly": {
+    "onprem": 793.33,
+    "cloud": 710,
+    "hybrid": 1623.33
+  },
+  "source_file": "cost/assumptions.yaml"
+}

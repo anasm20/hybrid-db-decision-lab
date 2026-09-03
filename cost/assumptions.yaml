@@ -1,0 +1,32 @@
+version: "0.1-example"
+provenance: MODELLED
+currency: EUR
+notes:
+  - Replace every example number with a sourced value before presenting production TCO.
+  - Cloud list prices are not invoices; discounts, reservations, taxes and support can differ.
+
+onprem:
+  server_capex_eur: 8000
+  storage_capex_eur: 3000
+  network_capex_eur: 1500
+  amortization_months: 60
+  electricity_kwh_month: 180
+  electricity_eur_kwh: 0.25
+  facilities_eur_month: 120
+  licenses_eur_month: 0
+  admin_hours_month: 6
+  admin_hourly_eur: 70
+
+cloud:
+  compute_eur_month: 180
+  database_eur_month: 220
+  storage_eur_month: 45
+  network_egress_eur_month: 30
+  backup_eur_month: 25
+  support_eur_month: 0
+  admin_hours_month: 3
+  admin_hourly_eur: 70
+
+hybrid:
+  shared_tooling_eur_month: 40
+  connectivity_eur_month: 80

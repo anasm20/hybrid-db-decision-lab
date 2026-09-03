@@ -1,0 +1,48 @@
+{
+  "provenance": "DERIVED_FROM_MEASURED",
+  "run_count": 0,
+  "rpo": {
+    "acknowledged_write_loss_probes": {
+      "median": null,
+      "max": null
+    },
+    "probe_interval_seconds": 0.2,
+    "estimated_seconds": {
+      "median": null,
+      "max": null
+    }
+  },
+  "rto_seconds": {
+    "median": null,
+    "mean": null,
+    "min": null,
+    "max": null,
+    "bootstrap_95_ci_median": [
+      null,
+      null
+    ]
+  },
+  "error_rate": {
+    "median": null,
+    "max": null
+  },
+  "latency_ms": {
+    "p95": {
+      "median": null,
+      "max": null
+    },
+    "p99": {
+      "median": null,
+      "max": null
+    }
+  },
+  "replication_lag_seconds": {
+    "median": null,
+    "max": null
+  },
+  "throughput_rps": {
+    "median": null,
+    "max": null
+  },
+  "runs": []
+}

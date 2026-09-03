@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hybrid Database Decision Lab</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header><div><span class="eyebrow">ARCHITECTURE EVALUATION PoC</span><h1>Hybrid Database Decision Lab</h1><p>Messbare Performance, Resilienz und Kosten vor der Technologieentscheidung.</p></div><div class="badge">Evidence-first</div></header>
+<nav><a href="#kpis">Kennzahlen</a><a href="#connect">Daten verbinden</a><a href="#overview">Übersicht</a><a href="#evidence">Evidence</a><a href="#method">Methodik</a><a href="#decision">Entscheidung</a><span class="nav-spacer"></span><span id="live-status" class="pill live-pill">live</span></nav>
+<div id="static-banner" class="static-banner">📄 Statische Ansicht (z. B. GitHub Pages) — Kennzahlen sind vorab berechnete Snapshots aus dem Repository. Live-Dashboards, Datei-Upload und API-Anbindung sind nur in der lokalen Docker-Umgebung verfügbar: Repo klonen und <code>docker compose up -d --build</code> ausführen.</div>
+<div class="quicklinks local-only" hidden>
+  <a class="qlink" href="http://localhost:8080/docs" target="_blank" rel="noopener"><span class="qdot" style="background:#2563eb"></span>Demo API</a>
+  <a class="qlink" href="http://localhost:3000" target="_blank" rel="noopener"><span class="qdot" style="background:#f97316"></span>Grafana</a>
+  <a class="qlink" href="http://localhost:9090" target="_blank" rel="noopener"><span class="qdot" style="background:#dc2626"></span>Prometheus</a>
+  <a class="qlink" href="http://localhost:8404/stats" target="_blank" rel="noopener"><span class="qdot" style="background:#16a34a"></span>HAProxy Stats</a>
+  <a class="qlink" href="http://localhost:8008/patroni" target="_blank" rel="noopener"><span class="qdot" style="background:#7c3aed"></span>Patroni 1</a>
+  <a class="qlink" href="http://localhost:8009/patroni" target="_blank" rel="noopener"><span class="qdot" style="background:#7c3aed"></span>Patroni 2</a>
+</div>
+<main>
+
+<section id="kpis">
+  <div class="section-head">
+    <div><span class="eyebrow">KENNZAHLEN · NACH PRIORITÄT</span><h2>Alles Wichtige auf einen Blick</h2></div>
+    <span id="run-count" class="pill">0 runs</span>
+  </div>
+  <div class="kpi-grid">
+
+    <article class="kpi-card" id="kpi-rpo">
+      <div class="kpi-top"><span class="kpi-rank">1</span><span class="kpi-gate" id="rpo-gate">NO DATA</span></div>
+      <small>RPO · Datenverlust</small>
+      <strong id="rpo-value">—</strong>
+      <span id="rpo-detail" class="kpi-sub">bestätigte Schreibvorgänge verloren</span>
+      <span class="kpi-note">Härtestes Ausschlusskriterium · Gate: 0 verlorene Writes</span>
+    </article>
+
+    <article class="kpi-card" id="kpi-rto">
+      <div class="kpi-top"><span class="kpi-rank">2</span><span class="kpi-gate" id="rto-gate">NO DATA</span></div>
+      <small>RTO · Ausfallzeit</small>
+      <strong id="rto-value">—</strong>
+      <span id="rto-detail" class="kpi-sub">Median, 95%-Bootstrap-CI: —</span>
+      <span class="kpi-note">Dauer bis Dienst wieder Schreibzugriffe akzeptiert · Gate: ≤ 30 s</span>
+    </article>
+
+    <article class="kpi-card" id="kpi-error">
+      <div class="kpi-top"><span class="kpi-rank">3</span><span class="kpi-gate" id="error-gate">NO DATA</span></div>
+      <small>Fehlerrate</small>
+      <strong id="error-value">—</strong>
+      <span id="error-detail" class="kpi-sub">fehlgeschlagene Requests während Workload</span>
+      <span class="kpi-note">Merken Nutzer Ausfälle/Instabilität? · Schwelle: &lt; 5%</span>
+    </article>
+
+    <article class="kpi-card" id="kpi-latency">
+      <div class="kpi-top"><span class="kpi-rank">4</span><span class="kpi-gate" id="latency-gate">NO DATA</span></div>
+      <small>Latenz p95 / p99</small>
+      <strong id="latency-value">—</strong>
+      <span id="latency-detail" class="kpi-sub">Millisekunden, Median über alle Runs</span>
+      <span class="kpi-note">Reaktionsfähigkeit unter Last · Schwelle: p95 &lt; 500 ms</span>
+    </article>
+
+    <article class="kpi-card" id="kpi-lag">
+      <div class="kpi-top"><span class="kpi-rank">5</span><span class="kpi-gate" id="lag-gate">NO DATA</span></div>
+      <small>Replication Lag</small>
+      <strong id="lag-value">—</strong>
+      <span id="lag-detail" class="kpi-sub">max. beobachtete Sekunden während Runs</span>
+      <span class="kpi-note">Früher Warnindikator für Datenverlust · Live-Verlauf in Grafana</span>
+    </article>
+
+    <article class="kpi-card" id="kpi-throughput">
+      <div class="kpi-top"><span class="kpi-rank">6</span><span class="kpi-gate">MODELLED</span></div>
+      <small>Durchsatz &amp; Kosten</small>
+      <strong id="throughput-value">—</strong>
+      <span id="throughput-detail" class="kpi-sub">Requests/Sekunde, Median</span>
+      <div id="cost-mini" class="cost-mini"></div>
+    </article>
+
+  </div>
+</section>
+
+<section id="connect" class="local-only" hidden>
+  <div class="section-head"><div><span class="eyebrow">ECHTE DATEN</span><h2>On-Prem / Cloud verbinden</h2></div><p>Zwei Wege, echte Messungen einzuspielen — beide landen als <code>MEASURED</code>-Evidence in <code>experiments/</code> und aktualisieren die Kennzahlen oben automatisch.</p></div>
+  <div class="connect-grid">
+    <div class="card">
+      <h3>1 · Datei hochladen</h3>
+      <p class="muted">Eine <code>result.json</code> (Schema wie von <code>scripts/run_failover.py</code> erzeugt) direkt hochladen.</p>
+      <label class="field-label">API-Token</label>
+      <input id="api-token" type="password" placeholder="aus .env: DASHBOARD_API_TOKEN" autocomplete="off">
+      <input id="upload-file" type="file" accept="application/json" class="field-file">
+      <button id="upload-btn" class="btn-primary">Hochladen</button>
+      <p id="upload-status" class="muted"></p>
+    </div>
+    <div class="card">
+      <h3>2 · API anbinden</h3>
+      <p class="muted">Für automatisierte Pushes aus eigenem Monitoring/CI, ohne manuellen Upload:</p>
+      <pre class="code-block">curl -X POST http://localhost:8000/api/ingest \
+  -H "Authorization: Bearer &lt;DASHBOARD_API_TOKEN&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "experiment_id": "PROD-2026-09-03-01",
+    "scenario": "primary-failure",
+    "rto_seconds": 12.4,
+    "acknowledged_write_loss": 0,
+    "replication_lag_seconds_max": 0.8,
+    "workload": {"p95_ms": 210, "p99_ms": 340, "error_rate": 0.01, "throughput_rps": 48.2}
+  }'</pre>
+      <p class="muted">Token steht in <code>.env</code> (<code>DASHBOARD_API_TOKEN</code>). Jedes Feld außer <code>experiment_id</code> ist optional.</p>
+    </div>
+  </div>
+</section>
+
+<section id="overview"><div class="section-head"><div><span class="eyebrow">OPERATING MODES</span><h2>On-Prem · Cloud · Hybrid</h2></div><p>Die App präsentiert abgeleitete Ergebnisse. Rohdaten und Messung bleiben im Repository.</p></div>
+<div class="modes"><article><b>ON_PREM_ONLY</b><span>Lokale App + DB Primary</span></article><article><b>CLOUD_ONLY</b><span>Cloud App + DB Primary</span></article><article class="accent"><b>HYBRID</b><span>Primary + synchronisierte Standby-Site</span></article></div></section>
+
+<section id="evidence"><div class="section-head"><div><span class="eyebrow">MEASURED</span><h2>Failover Evidence</h2></div><span class="pill">RTO je Run</span></div>
+<div class="card simulation-card local-only" hidden>
+  <div>
+    <h3>Failover demonstrieren</h3>
+    <p class="muted">Erzeugt einen simulierten Beispiel-Run. Das Ergebnis wird nicht als echte Messung gespeichert und erscheint nicht im MEASURED-Diagramm.</p>
+  </div>
+  <button id="simulate-btn" class="btn-primary">Simulation starten</button>
+  <p id="simulate-status" class="muted simulation-status">Bereit</p>
+  <div id="simulation-result" class="simulation-result" hidden></div>
+</div>
+<div class="card"><h3>RTO by run</h3><div id="chart" class="chart"></div></div>
+<div class="card"><h3>Kosten pro Monat (MODELLED)</h3><div id="cost-cards" class="kpis"></div></div>
+</section>
+
+<section id="method"><div class="section-head"><div><span class="eyebrow">REPRODUCIBILITY</span><h2>Methodik</h2></div></div><div class="steps"><div><b>01</b><span>Requirements & mandatory gates</span></div><div><b>02</b><span>Protocol preregistration</span></div><div><b>03</b><span>Repeated identical workload</span></div><div><b>04</b><span>Controlled failure injection</span></div><div><b>05</b><span>Raw evidence + checksum</span></div><div><b>06</b><span>Statistics + sensitivity</span></div></div></section>
+<section id="decision"><div class="section-head"><div><span class="eyebrow">DECISION LAYER</span><h2>Was diese Plattform beweisen kann</h2></div></div><blockquote>Nicht: „Hybrid ist immer am besten.“ Sondern: „Unter den dokumentierten Anforderungen und Testbedingungen erfüllt Kandidat X die Gates und zeigt den robustesten Trade-off.“</blockquote><p class="muted">Grafana beantwortet „Was passierte technisch?“. Diese Seite beantwortet „Was bedeutet das für die Architekturentscheidung?“.</p></section>
+</main>
+<footer>Hybrid Database Decision Lab · Static GitHub Pages presentation · no production secrets</footer>
+<script src="app.js"></script>
+</body></html>

@@ -1,0 +1,40 @@
+{
+  "provenance": "ASSESSED_AND_MODELLED",
+  "status": "FRAMEWORK_ONLY",
+  "message": "A comparative winner is intentionally not calculated until measured datasets exist for all candidates under the same protocol.",
+  "weights": {
+    "resilience": 0.25,
+    "performance": 0.2,
+    "data_integrity": 0.15,
+    "cost": 0.15,
+    "sovereignty": 0.1,
+    "portability": 0.1,
+    "operations": 0.05
+  },
+  "assessed_scores": {
+    "onprem": {
+      "sovereignty": 95,
+      "portability": 70,
+      "operations": 65
+    },
+    "cloud": {
+      "sovereignty": 60,
+      "portability": 60,
+      "operations": 85
+    },
+    "hybrid": {
+      "sovereignty": 85,
+      "portability": 75,
+      "operations": 55
+    }
+  },
+  "monthly_cost": {
+    "onprem": 793.33,
+    "cloud": 710,
+    "hybrid": 1623.33
+  },
+  "mandatory_gates": {
+    "rto_seconds_max": 30,
+    "acknowledged_write_loss_max": 0
+  }
+}

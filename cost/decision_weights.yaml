@@ -1,0 +1,29 @@
+version: "0.1-example"
+provenance: ASSESSED
+mandatory_gates:
+  rto_seconds_max: 30
+  acknowledged_write_loss_max: 0
+weights:
+  resilience: 0.25
+  performance: 0.20
+  data_integrity: 0.15
+  cost: 0.15
+  sovereignty: 0.10
+  portability: 0.10
+  operations: 0.05
+assessed_scores_0_to_100:
+  onprem:
+    sovereignty: 95
+    portability: 70
+    operations: 65
+  cloud:
+    sovereignty: 60
+    portability: 60
+    operations: 85
+  hybrid:
+    sovereignty: 85
+    portability: 75
+    operations: 55
+notes:
+  - Assessed scores are placeholders until agreed by stakeholders.
+  - Measured dimensions must be derived from experiments, not entered manually.
