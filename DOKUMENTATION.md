@@ -1,6 +1,6 @@
 # Hybrid Database Decision Lab — Gesamtdokumentation
 
-In diesen Doku werden Fachbegriffe bei ihrer ersten Verwendung kurz erklärt. Ziel ist, dass auch Leser ohne tiefes Datenbank-Fachwissen nachvollziehen können, was hier gemessen wird, wie und warum.
+In dieser Doku werden Fachbegriffe bei ihrer ersten Verwendung kurz erklärt. Ziel ist es, dass auch Leser ohne tiefgehendes Datenbank-Fachwissen nachvollziehen können, was hier gemessen wird, wie es gemessen wird und warum.
 
 ## Ablauf auf einen Blick
 
