@@ -1,0 +1,33 @@
+[
+  {
+    "at": "2026-09-03T14:02:46.233550+00:00",
+    "epoch": 1788444166.2335763,
+    "event": "experiment_started",
+    "initial_primary": "postgres1",
+    "vus": 10,
+    "duration": "1m",
+    "server_model": "small",
+    "app_hosting": [
+      "azure"
+    ]
+  },
+  {
+    "at": "2026-09-03T14:03:46.260237+00:00",
+    "epoch": 1788444226.260266,
+    "event": "failure_injected",
+    "target": "postgres1"
+  },
+  {
+    "at": "2026-09-03T14:04:02.578947+00:00",
+    "epoch": 1788444242.5789583,
+    "event": "new_primary_detected",
+    "node": "postgres2",
+    "elapsed_seconds": 16.31651520729065
+  },
+  {
+    "at": "2026-09-03T14:04:04.130310+00:00",
+    "epoch": 1788444244.1303282,
+    "event": "service_write_recovered",
+    "elapsed_seconds": 17.867880821228027
+  }
+]

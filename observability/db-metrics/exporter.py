@@ -26,11 +26,26 @@ def collect_node(node, dsn, patroni):
         with psycopg.connect(dsn, connect_timeout=2, autocommit=True) as conn:
             conns = conn.execute("SELECT count(*) FROM pg_stat_activity").fetchone()[0]
             xact = conn.execute("SELECT COALESCE(sum(xact_commit),0) FROM pg_stat_database").fetchone()[0]
-            lag = conn.execute("SELECT CASE WHEN pg_is_in_recovery() THEN COALESCE(EXTRACT(EPOCH FROM now()-pg_last_xact_replay_timestamp()),0) ELSE 0 END").fetchone()[0]
+            in_recovery = conn.execute("SELECT pg_is_in_recovery()").fetchone()[0]
+            if in_recovery:
+                # Lag for a standby is reported by the primary below (pg_stat_replication),
+                # not measured here — see the note in the primary branch for why.
+                pass
+            else:
+                LAG.labels(node).set(0.0)
+                # pg_stat_replication.replay_lag is fed by WAL-receiver feedback and reflects
+                # the *current* delay. A naive "now() - pg_last_xact_replay_timestamp()" on the
+                # standby instead measures time since the last write was replayed, which grows
+                # unbounded during idle periods even though the standby is fully caught up.
+                rows = conn.execute(
+                    "SELECT application_name, EXTRACT(EPOCH FROM replay_lag) FROM pg_stat_replication"
+                ).fetchall()
+                for app_name, lag_seconds in rows:
+                    if app_name in NODES:
+                        LAG.labels(app_name).set(float(lag_seconds or 0))
         UP.labels(node).set(1)
         CONNS.labels(node).set(conns)
         XACT.labels(node).set(xact)
-        LAG.labels(node).set(float(lag or 0))
     except Exception:
         UP.labels(node).set(0)
         SCRAPE_ERRORS.labels(node).inc()

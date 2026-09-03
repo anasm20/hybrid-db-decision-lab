@@ -1,0 +1,8 @@
+{
+  "experiment_id": "EXP-20260903-140552",
+  "provenance": "MEASURED",
+  "status": "COMPLETED",
+  "completed_at": "2026-09-03T14:07:13.088438+00:00",
+  "initial_primary": "postgres2",
+  "promoted_primary": "postgres1"
+}

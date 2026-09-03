@@ -1,48 +1,138 @@
 {
   "provenance": "DERIVED_FROM_MEASURED",
-  "run_count": 0,
+  "run_count": 2,
   "rpo": {
     "acknowledged_write_loss_probes": {
-      "median": null,
-      "max": null
+      "median": 0.0,
+      "max": 0
     },
     "probe_interval_seconds": 0.2,
     "estimated_seconds": {
-      "median": null,
-      "max": null
+      "median": 0.0,
+      "max": 0.0
     }
   },
   "rto_seconds": {
-    "median": null,
-    "mean": null,
-    "min": null,
-    "max": null,
+    "median": 18.082929968833923,
+    "mean": 18.082929968833923,
+    "min": 17.867880821228027,
+    "max": 18.29797911643982,
     "bootstrap_95_ci_median": [
-      null,
-      null
+      17.867880821228027,
+      18.29797911643982
     ]
   },
   "error_rate": {
-    "median": null,
-    "max": null
+    "median": 0.02961723066486596,
+    "max": 0.05543795411636821
   },
   "latency_ms": {
     "p95": {
-      "median": null,
-      "max": null
+      "median": 43.28333949999999,
+      "max": 58.6088563
     },
     "p99": {
-      "median": null,
-      "max": null
+      "median": 114.96617699999999,
+      "max": 164.27866449999996
     }
   },
   "replication_lag_seconds": {
-    "median": null,
-    "max": null
+    "median": 3643.845148,
+    "max": 7287.688122
   },
   "throughput_rps": {
-    "median": null,
-    "max": null
+    "median": 136.7592170556011,
+    "max": 193.9731141370177
   },
-  "runs": []
+  "runs": [
+    {
+      "experiment_id": "AZURE-DEMO-2026-09-03",
+      "provenance": "SIMULATED",
+      "scenario": "primary-failover-demo",
+      "initial_primary": "azure-flexible-postgres-primary-westeurope",
+      "promoted_primary": "azure-flexible-postgres-replica-westeurope",
+      "rto_seconds": 18.4,
+      "acknowledged_write_loss": 0,
+      "replication_lag_seconds_max": 1.2,
+      "started_at": "2026-09-03T09:00:00+00:00",
+      "finished_at": "2026-09-03T09:05:00+00:00",
+      "workload": {
+        "p95_ms": 240,
+        "p99_ms": 410,
+        "error_rate": 0.014,
+        "throughput_rps": 52.3
+      },
+      "source_note": "Demo-Werte im Zielformat von 'az monitor metrics list -o json' \u2014 zum Testen des Upload-/Ingest-Workflows, keine echte Messung."
+    },
+    {
+      "experiment_id": "EXP-20260903-132932",
+      "provenance": "MEASURED",
+      "scenario": "primary-failure",
+      "initial_primary": "postgres2",
+      "promoted_primary": "postgres1",
+      "rto_seconds": 18.29797911643982,
+      "last_acknowledged_probe": 1788442178745,
+      "max_probe_after_recovery": 1788442256739,
+      "acknowledged_write_loss": 0,
+      "replication_lag_seconds_max": 7287.688122,
+      "started_at": "2026-09-03T13:29:38.436597+00:00",
+      "finished_at": "2026-09-03T13:30:58.171481+00:00",
+      "workload": {
+        "p95_ms": 58.6088563,
+        "p99_ms": 164.27866449999996,
+        "error_rate": 0.05543795411636821,
+        "throughput_rps": 193.9731141370177
+      }
+    },
+    {
+      "experiment_id": "EXP-20260903-140245",
+      "provenance": "MEASURED",
+      "scenario": "primary-failure",
+      "initial_primary": "postgres1",
+      "promoted_primary": "postgres2",
+      "rto_seconds": 17.867880821228027,
+      "last_acknowledged_probe": 1788444166565,
+      "max_probe_after_recovery": 1788444244120,
+      "acknowledged_write_loss": 0,
+      "replication_lag_seconds_max": 0.002174,
+      "started_at": "2026-09-03T14:02:46.233550+00:00",
+      "finished_at": "2026-09-03T14:04:05.533500+00:00",
+      "topology": {
+        "database_site": "on-prem",
+        "app_hosting": [
+          "azure"
+        ],
+        "server_model": "small"
+      },
+      "load": {
+        "vus": 10,
+        "duration": "1m"
+      },
+      "workload": {
+        "p95_ms": 27.957822699999983,
+        "p99_ms": 65.6536895,
+        "error_rate": 0.0037965072133637054,
+        "throughput_rps": 79.54531997418452
+      }
+    },
+    {
+      "experiment_id": "OCI-DEMO-2026-09-03",
+      "provenance": "SIMULATED",
+      "scenario": "primary-failover-demo",
+      "initial_primary": "oci-dbsystem-primary-frankfurt",
+      "promoted_primary": "oci-dbsystem-standby-frankfurt",
+      "rto_seconds": 22.7,
+      "acknowledged_write_loss": 1,
+      "replication_lag_seconds_max": 2.5,
+      "started_at": "2026-09-03T09:00:00+00:00",
+      "finished_at": "2026-09-03T09:06:00+00:00",
+      "workload": {
+        "p95_ms": 275,
+        "p99_ms": 460,
+        "error_rate": 0.021,
+        "throughput_rps": 44.8
+      },
+      "source_note": "Demo-Werte im Zielformat von 'oci monitoring metric-data summarize-metrics-data --output json' \u2014 zum Testen des Upload-/Ingest-Workflows, keine echte Messung."
+    }
+  ]
 }

@@ -14,11 +14,24 @@ from fastapi import FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-ROOT = Path("/workspace")
+ROOT = Path(os.getenv("HOST_PROJECT_DIR", "/workspace"))
 EXPERIMENTS = ROOT / "experiments"
 SITE = ROOT / "site"
 API_TOKEN = os.getenv("DASHBOARD_API_TOKEN", "")
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
+SERVER_MODELS = {"small", "medium", "large"}
+DURATIONS = {"1m", "3m", "5m", "10m"}
+
+# Env overrides so scripts/run_failover.py — normally executed on the host, where it
+# reaches services via the docker-compose port mappings on localhost — resolves the
+# same services by their Docker network name when spawned from inside this container.
+SCENARIO_RUN_ENV = {
+    "PATRONI1_URL": "http://postgres1:8008/patroni",
+    "PATRONI2_URL": "http://postgres2:8008/patroni",
+    "DEMO_API_URL": "http://demo-api:8080",
+    "LAG_METRICS_URL": "http://db-metrics:9105/metrics",
+    "DASHBOARD_URL": "http://localhost:8000",
+}
 
 # Terminal event kinds that mark a run as no longer active/live.
 TERMINAL_EVENTS = {"service_write_recovered", "recovery_timeout", "experiment_completed"}
@@ -160,6 +173,53 @@ def get_events(run_id: Optional[str] = None, since_epoch: Optional[float] = None
     if since_epoch is not None:
         rows = [r for r in rows if r.get("epoch", 0) > since_epoch]
     return {"active_run_ids": active, "events": rows[-500:]}
+
+
+class ScenarioRequest(BaseModel):
+    server_model: str = "medium"
+    vus: int = 25
+    duration: str = "3m"
+    app_hosting: list = []
+
+
+@app.post("/api/run-scenario")
+def run_scenario(payload: ScenarioRequest, authorization: Optional[str] = Header(None)):
+    require_token(authorization)
+    if payload.server_model not in SERVER_MODELS:
+        raise HTTPException(400, f"server_model must be one of {sorted(SERVER_MODELS)}")
+    if payload.duration not in DURATIONS:
+        raise HTTPException(400, f"duration must be one of {sorted(DURATIONS)}")
+    if not (1 <= payload.vus <= 1000):
+        raise HTTPException(400, "vus must be between 1 and 1000")
+
+    with _events_lock:
+        if ACTIVE_RUNS:
+            raise HTTPException(409, f"a run is already active: {list(ACTIVE_RUNS.keys())}")
+
+    app_hosting = ",".join(str(x) for x in payload.app_hosting) if payload.app_hosting else "on-prem"
+
+    new_exp = subprocess.run(
+        ["python3", "scripts/new_experiment.py", "--scenario", "primary-failure", "--repetitions", "1",
+         "--vus", str(payload.vus), "--duration", payload.duration,
+         "--server-model", payload.server_model, "--app-hosting", app_hosting],
+        cwd=str(ROOT), capture_output=True, text=True,
+    )
+    if new_exp.returncode != 0:
+        raise HTTPException(500, f"new_experiment.py failed: {new_exp.stderr[-1500:]}")
+    run_id = (new_exp.stdout.strip().splitlines() or [""])[0].strip()
+    if not SAFE_ID.match(run_id):
+        raise HTTPException(500, f"unexpected run id from new_experiment.py: {run_id!r}")
+
+    env = os.environ.copy()
+    env.update(SCENARIO_RUN_ENV)
+    log = open(EXPERIMENTS / run_id / "raw" / "runner.log", "w")
+    subprocess.Popen(
+        ["python3", "scripts/run_failover.py", "--run-id", run_id,
+         "--vus", str(payload.vus), "--duration", payload.duration,
+         "--server-model", payload.server_model, "--app-hosting", app_hosting],
+        cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT,
+    )
+    return {"started": True, "run_id": run_id}
 
 
 @app.get("/api/status")

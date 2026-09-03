@@ -20,13 +20,17 @@ def load_k6_workload(run_dir):
     try: d=json.loads(p.read_text())
     except Exception: return {}
     m=d.get('metrics',{})
-    dur=m.get('http_req_duration',{}).get('values',{})
-    failed=m.get('http_req_failed',{}).get('values',{})
-    reqs=m.get('http_reqs',{}).get('values',{})
+    # k6's --summary-export nests trend/rate stats under a "values" key on some
+    # versions and puts them directly on the metric object on others (e.g. 0.57.x)
+    # — support both. http_req_failed's rate is called "rate" in the nested form
+    # and "value" in the flat form.
+    dur=m.get('http_req_duration',{}); dur=dur.get('values',dur)
+    failed=m.get('http_req_failed',{}); failed=failed.get('values',failed)
+    reqs=m.get('http_reqs',{}); reqs=reqs.get('values',reqs)
     return {
         "p95_ms":dur.get('p(95)'),
         "p99_ms":dur.get('p(99)'),
-        "error_rate":failed.get('rate'),
+        "error_rate":failed.get('rate', failed.get('value')),
         "throughput_rps":reqs.get('rate'),
     }
 
@@ -39,12 +43,15 @@ def load_workload(run_dir, result):
         if v is not None: merged[k]=v
     return merged
 
-runs=[]
+all_runs=[]
 for p in sorted((ROOT/'experiments').glob('*/raw/result.json')):
     d=json.loads(p.read_text())
-    if d.get('provenance')!='MEASURED': continue
     d['workload']=load_workload(p.parents[1], d)
-    runs.append(d)
+    all_runs.append(d)
+
+# SIMULATED/demo runs are shown in the runs list for visibility but never feed
+# the aggregate KPI statistics or gate checks — those stay strictly MEASURED-only.
+runs=[x for x in all_runs if x.get('provenance')=='MEASURED']
 
 rto=[float(x['rto_seconds']) for x in runs if x.get('rto_seconds') is not None]
 loss=[int(x.get('acknowledged_write_loss',0)) for x in runs]
@@ -69,7 +76,7 @@ summary={
  "latency_ms": {"p95":stats(p95),"p99":stats(p99)},
  "replication_lag_seconds": stats(lag),
  "throughput_rps": stats(tput),
- "runs": runs,
+ "runs": all_runs,
 }
 out=ROOT/'site/data/summary.json'; out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps(summary,indent=2),encoding='utf-8')
 print(out)

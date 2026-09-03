@@ -123,13 +123,20 @@ services:
     build: ./dashboard
     environment:
       DASHBOARD_API_TOKEN: ${DASHBOARD_API_TOKEN:-changeme-token}
+      HOST_PROJECT_DIR: ${PWD}
     volumes:
-      - ./analysis:/workspace/analysis:ro
-      - ./experiments:/workspace/experiments
-      - ./site:/workspace/site
+      # Sibling-container pattern: the dashboard drives `docker compose`/`docker update`
+      # against the SAME host Docker daemon (not a nested one) so it can start/stop the
+      # real experiment scripts on click. This requires mirroring the bind mount at the
+      # identical host path — any relative paths compose resolves internally (e.g. for
+      # the k6 container) must exist at that path on the actual host, not just in this
+      # container. Mounting the docker socket effectively gives this container root on
+      # the host; it's gated behind DASHBOARD_API_TOKEN and only ever exposed on localhost.
+      - ${PWD}:${PWD}
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
-    networks: [app]
+    networks: [app, control, observability]
 
   k6:
     image: grafana/k6:0.57.0

@@ -6,8 +6,6 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
 ROOT=Path(__file__).resolve().parents[1]
-PATRONI={"postgres1":"http://localhost:8008/patroni","postgres2":"http://localhost:8009/patroni"}
-API="http://localhost:8080"
 
 def load_dotenv(path):
     if not path.exists(): return
@@ -18,6 +16,14 @@ def load_dotenv(path):
         os.environ.setdefault(k.strip(),v.strip())
 load_dotenv(ROOT/'.env')
 
+# Defaults assume this script runs on the host, reaching services through the
+# docker-compose port mappings on localhost. When the dashboard's "Jetzt ausführen"
+# button spawns this script from inside the dashboard container instead, it overrides
+# these via env vars to the services' Docker network names (see dashboard/app.py).
+PATRONI={"postgres1":os.getenv('PATRONI1_URL','http://localhost:8008/patroni'),
+         "postgres2":os.getenv('PATRONI2_URL','http://localhost:8009/patroni')}
+API=os.getenv('DEMO_API_URL','http://localhost:8080')
+LAG_METRICS_URL=os.getenv('LAG_METRICS_URL','http://localhost:9105/metrics')
 DASHBOARD_URL=os.getenv('DASHBOARD_URL','http://localhost:8000')
 DASHBOARD_TOKEN=os.getenv('DASHBOARD_API_TOKEN','')
 
@@ -56,7 +62,7 @@ def api_ok():
 
 def replication_lag_snapshot():
     try:
-        text = urlopen('http://localhost:9105/metrics', timeout=1).read().decode()
+        text = urlopen(LAG_METRICS_URL, timeout=1).read().decode()
     except Exception:
         return {}
     lag = {}
@@ -76,8 +82,36 @@ def sha256(path):
         for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
     return h.hexdigest()
 
-p=argparse.ArgumentParser(); p.add_argument('--run-id',required=True); p.add_argument('--warmup',type=int,default=60); p.add_argument('--timeout',type=int,default=90)
+SERVER_MODELS={
+ 'small': {'cpus':'1','memory':'1g'},
+ 'medium':{'cpus':'2','memory':'2g'},
+ 'large': {'cpus':'4','memory':'4g'},
+}
+
+def container_id(service):
+    r=subprocess.run(['docker','compose','ps','-q',service],cwd=ROOT,capture_output=True,text=True,check=True)
+    cid=r.stdout.strip()
+    if not cid: raise SystemExit(f'container for service "{service}" not found — is docker compose up?')
+    return cid
+
+def apply_server_model(model):
+    # Emulates picking an On-Prem server size: real Docker CPU/RAM limits on both
+    # database nodes, so the choice actually affects measured performance.
+    spec=SERVER_MODELS[model]
+    for service in ('postgres1','postgres2'):
+        cid=container_id(service)
+        subprocess.run(['docker','update','--cpus',spec['cpus'],'--memory',spec['memory'],'--memory-swap',spec['memory'],cid],check=True)
+
+p=argparse.ArgumentParser()
+p.add_argument('--run-id',required=True)
+p.add_argument('--warmup',type=int,default=60)
+p.add_argument('--timeout',type=int,default=90)
+p.add_argument('--vus',type=int,default=25,help='concurrent virtual users (simulated simultaneous access)')
+p.add_argument('--duration',default='3m',help='k6 workload duration, e.g. 1m/3m/10m')
+p.add_argument('--server-model',choices=sorted(SERVER_MODELS),default=None,help='apply On-Prem CPU/RAM limits to the DB nodes before the test')
+p.add_argument('--app-hosting',default='on-prem',help='comma-separated labels documenting where the app/web layer runs, e.g. aws,azure for multi-cloud (DB always stays On-Prem in this lab)')
 a=p.parse_args()
+app_hosting=[x.strip() for x in a.app_hosting.split(',') if x.strip()]
 exp=ROOT/'experiments'/a.run_id; raw=exp/'raw'; raw.mkdir(parents=True,exist_ok=True)
 if not (exp/'protocol.yaml').exists(): raise SystemExit('protocol.yaml missing: create/preregister experiment first')
 
@@ -88,7 +122,8 @@ def event(kind,**kw):
 
 primary=leader()
 if not primary: raise SystemExit('No Patroni leader detected. Start docker compose first.')
-event('experiment_started',initial_primary=primary)
+if a.server_model: apply_server_model(a.server_model)
+event('experiment_started',initial_primary=primary,vus=a.vus,duration=a.duration,server_model=a.server_model,app_hosting=app_hosting)
 
 stop_probe=False; ack=[]
 def probe_loop():
@@ -112,7 +147,7 @@ lt=threading.Thread(target=lag_loop,daemon=True); lt.start()
 
 k6out=raw/'k6-summary.json'
 env=os.environ.copy(); env['RUN_ID']=a.run_id
-k6cmd=['docker','compose','run','--rm','-e',f'RUN_ID={a.run_id}','-e','DURATION=3m','k6','run','--summary-export',f'/experiments/{a.run_id}/raw/k6-summary.json','/scripts/steady.js']
+k6cmd=['docker','compose','run','--rm','-e',f'RUN_ID={a.run_id}','-e',f'DURATION={a.duration}','-e',f'VUS={a.vus}','k6','run','--summary-export',f'/experiments/{a.run_id}/raw/k6-summary.json','/scripts/steady.js']
 k6=subprocess.Popen(k6cmd,cwd=ROOT,env=env,stdout=open(raw/'k6.log','w'),stderr=subprocess.STDOUT)
 
 time.sleep(a.warmup)
@@ -150,7 +185,9 @@ result={
  "initial_primary":primary,"promoted_primary":new_primary,"rto_seconds":rto,
  "last_acknowledged_probe":last_ack,"max_probe_after_recovery":max_seq,
  "acknowledged_write_loss":lost,"replication_lag_seconds_max":max(lag_samples) if lag_samples else None,
- "started_at":events[0]['at'],"finished_at":now()
+ "started_at":events[0]['at'],"finished_at":now(),
+ "topology":{"database_site":"on-prem","app_hosting":app_hosting,"server_model":a.server_model},
+ "load":{"vus":a.vus,"duration":a.duration},
 }
 (raw/'events.json').write_text(json.dumps(events,indent=2),encoding='utf-8')
 (raw/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')

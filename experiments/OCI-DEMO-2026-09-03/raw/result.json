@@ -1,0 +1,19 @@
+{
+  "experiment_id": "OCI-DEMO-2026-09-03",
+  "provenance": "SIMULATED",
+  "scenario": "primary-failover-demo",
+  "initial_primary": "oci-dbsystem-primary-frankfurt",
+  "promoted_primary": "oci-dbsystem-standby-frankfurt",
+  "rto_seconds": 22.7,
+  "acknowledged_write_loss": 1,
+  "replication_lag_seconds_max": 2.5,
+  "started_at": "2026-09-03T09:00:00+00:00",
+  "finished_at": "2026-09-03T09:06:00+00:00",
+  "workload": {
+    "p95_ms": 275,
+    "p99_ms": 460,
+    "error_rate": 0.021,
+    "throughput_rps": 44.8
+  },
+  "source_note": "Demo-Werte im Zielformat von 'oci monitoring metric-data summarize-metrics-data --output json' \u2014 zum Testen des Upload-/Ingest-Workflows, keine echte Messung."
+}

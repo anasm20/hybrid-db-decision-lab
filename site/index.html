@@ -7,7 +7,7 @@
 </head>
 <body>
 <header><div><span class="eyebrow">ARCHITECTURE EVALUATION PoC</span><h1>Hybrid Database Decision Lab</h1><p>Messbare Performance, Resilienz und Kosten vor der Technologieentscheidung.</p></div><div class="badge">Evidence-first</div></header>
-<nav><a href="#kpis">Kennzahlen</a><a href="#recent-runs">Runs</a><a href="#connect">Daten verbinden</a><a href="#overview">Übersicht</a><a href="#evidence">Evidence</a><a href="#method">Methodik</a><a href="#decision">Entscheidung</a><span class="nav-spacer"></span><span id="live-status" class="pill live-pill">live</span></nav>
+<nav><a href="#kpis">Kennzahlen</a><a href="#scenario">Szenario</a><a href="#recent-runs">Runs</a><a href="#connect">Daten verbinden</a><a href="#overview">Übersicht</a><a href="#evidence">Evidence</a><a href="#method">Methodik</a><a href="#decision">Entscheidung</a><span class="nav-spacer"></span><span id="live-status" class="pill live-pill">live</span></nav>
 <div id="static-banner" class="static-banner">📄 Statische Ansicht (z. B. GitHub Pages) — Kennzahlen sind vorab berechnete Snapshots aus dem Repository. Live-Dashboards, Datei-Upload und API-Anbindung sind nur in der lokalen Docker-Umgebung verfügbar: Repo klonen und <code>docker compose up -d --build</code> ausführen.</div>
 <div class="quicklinks local-only" hidden>
   <a class="qlink" href="http://localhost:8080/docs" target="_blank" rel="noopener"><span class="qdot" style="background:#2563eb"></span>Demo API</a>
@@ -87,20 +87,89 @@
   </div>
 </section>
 
+<section id="scenario">
+  <div class="section-head"><div><span class="eyebrow">TEST-KONFIGURATION</span><h2>Szenario &amp; Last einstellen</h2></div><p>Fixe Architektur-Entscheidung dieses Labs: die <b>Datenbank läuft immer On-Prem</b> (dieser Docker-Postgres/Patroni-Stack). Der App-/Web-Layer gilt als Cloud- bzw. Multi-Cloud-gehostet — wähle unten Server-Größe, gleichzeitige Nutzer und Zielprovider; darunter erscheint der fertige Befehl.</p></div>
+  <div class="card scenario-form">
+    <div class="scenario-grid">
+      <label>On-Prem Server-Modell (DB-Knoten)
+        <select id="sc-model">
+          <option value="small">Klein — 1 vCPU / 1 GB</option>
+          <option value="medium" selected>Mittel — 2 vCPU / 2 GB</option>
+          <option value="large">Groß — 4 vCPU / 4 GB</option>
+        </select>
+      </label>
+      <label>Gleichzeitige Nutzer (VUs)
+        <input id="sc-vus" type="number" min="1" max="1000" value="25">
+      </label>
+      <label>Testdauer
+        <select id="sc-duration">
+          <option value="1m">1 Minute</option>
+          <option value="3m" selected>3 Minuten</option>
+          <option value="5m">5 Minuten</option>
+          <option value="10m">10 Minuten</option>
+        </select>
+      </label>
+      <div class="scenario-cloud">
+        <span class="field-label">App-Hosting (Cloud / Multi-Cloud)</span>
+        <div class="cloud-checks">
+          <label><input type="checkbox" value="aws" class="sc-cloud"> AWS</label>
+          <label><input type="checkbox" value="azure" class="sc-cloud"> Azure</label>
+          <label><input type="checkbox" value="gcp" class="sc-cloud"> GCP</label>
+          <label><input type="checkbox" value="oci" class="sc-cloud"> OCI</label>
+        </div>
+      </div>
+    </div>
+    <p class="muted">Datenbank-Standort ist fest auf <b>On-Prem</b> verdrahtet — nur der App-Layer ist wählbar. Ohne Cloud-Auswahl läuft die App ebenfalls On-Prem (Baseline-Vergleich).</p>
+    <p class="muted">Das Server-Modell setzt echte Docker-CPU/RAM-Limits auf den DB-Containern und bleibt bis zum nächsten Testlauf aktiv. Komplett zurücksetzen: <code>docker compose up -d --force-recreate postgres1 postgres2</code>.</p>
+    <div class="scenario-run local-only" hidden>
+      <label class="field-label">Direkt ausführen</label>
+      <input id="sc-token" type="password" placeholder="API-Token (aus .env: DASHBOARD_API_TOKEN)" autocomplete="off">
+      <button id="sc-run" class="btn-primary btn-run">▶ Jetzt ausführen</button>
+      <span id="sc-run-status" class="muted"></span>
+      <p class="muted scenario-run-note">Startet <code>new_experiment.py</code> + <code>run_failover.py</code> direkt im Dashboard-Container (killt kontrolliert den aktuellen Primary) — Fortschritt erscheint oben im Live-Panel. Nur ein Lauf gleichzeitig möglich.</p>
+    </div>
+    <label class="field-label">…oder Befehle manuell ausführen</label>
+    <pre id="sc-command" class="code-block"></pre>
+    <button id="sc-copy" class="btn-primary">Befehle kopieren</button>
+    <span id="sc-copy-status" class="muted"></span>
+  </div>
+</section>
+
 <section id="recent-runs">
   <div class="section-head"><div><span class="eyebrow">ALLE TESTERGEBNISSE</span><h2>Letzte Runs</h2></div><span class="pill">aktualisiert alle 5s</span></div>
   <div class="card table-card">
     <table id="runs-table" class="runs-table">
-      <thead><tr><th>Run-ID</th><th>Provenienz</th><th>RTO</th><th>Verlorene Writes</th><th>p95 / p99</th><th>Fehlerrate</th><th>Zeitpunkt</th></tr></thead>
-      <tbody id="runs-table-body"><tr><td colspan="7" class="muted">Noch keine Runs.</td></tr></tbody>
+      <thead><tr><th>Bewertung</th><th>Run-ID</th><th>Provenienz</th><th>Szenario</th><th>RTO</th><th>Verlorene Writes</th><th>p95 / p99</th><th>Fehlerrate</th><th>Zeitpunkt</th></tr></thead>
+      <tbody id="runs-table-body"><tr><td colspan="9" class="muted">Noch keine Runs.</td></tr></tbody>
     </table>
   </div>
 </section>
 
-<section id="connect" class="local-only" hidden>
-  <div class="section-head"><div><span class="eyebrow">ECHTE DATEN</span><h2>On-Prem / Cloud verbinden</h2></div><p>Zwei Wege, echte Messungen einzuspielen — beide landen als <code>MEASURED</code>-Evidence in <code>experiments/</code> und aktualisieren die Kennzahlen oben automatisch.</p></div>
+<section id="connect">
+  <div class="section-head"><div><span class="eyebrow">ECHTE DATEN</span><h2>On-Prem / Cloud verbinden</h2></div><p>Drei Wege, echte Messungen einzuspielen — Uploads und API-Pushes landen als <code>MEASURED</code>-Evidence in <code>experiments/</code> und aktualisieren die Kennzahlen oben automatisch.</p></div>
   <div class="connect-grid">
     <div class="card">
+      <h3>0 · Aus Azure oder OCI exportieren</h3>
+      <p class="muted">Bevor sich etwas hochladen lässt, müssen die Rohmetriken erst aus der Cloud raus. Beide Provider liefern direkt verwendbares JSON:</p>
+      <p class="muted"><b>Azure</b> — Azure Monitor liefert Replication Lag, Verbindungen und Latenz pro Ressource:</p>
+      <pre class="code-block">az monitor metrics list \
+  --resource &lt;resource-id&gt; \
+  --metric "replica_lag,active_connections,connections_failed" \
+  --start-time 2026-09-03T09:00:00Z --end-time 2026-09-03T09:10:00Z \
+  --output json</pre>
+      <p class="muted"><b>OCI</b> — der Monitoring-Service liefert dieselben Metriken über eine Query gegen den <code>oci_database</code>-Namespace:</p>
+      <pre class="code-block">oci monitoring metric-data summarize-metrics-data \
+  --compartment-id &lt;compartment-ocid&gt; \
+  --namespace oci_database \
+  --query-text 'ReplicationLag[1m].mean()' \
+  --output json</pre>
+      <p class="muted">Beide CLIs exportieren rohe Zeitreihen (Lag, Latenz, Fehler, Durchsatz) — für RTO/RPO braucht es zusätzlich einen echten, kontrollierten Failover-Test mit eigenen Zeitstempeln, analog zu <code>scripts/run_failover.py</code>. Die exportierten Werte anschließend in unser Schema (<code>rto_seconds</code>, <code>replication_lag_seconds_max</code>, <code>workload.*</code>) umrechnen und hochladen oder per API pushen — zwei Beispieldateien im Zielformat:</p>
+      <p class="example-links">
+        <a href="examples/azure-demo-result.json" download class="qlink"><span class="qdot" style="background:#0078d4"></span>azure-demo-result.json</a>
+        <a href="examples/oci-demo-result.json" download class="qlink"><span class="qdot" style="background:#f80000"></span>oci-demo-result.json</a>
+      </p>
+    </div>
+    <div class="card local-only" hidden>
       <h3>1 · Datei hochladen</h3>
       <p class="muted">Eine <code>result.json</code> (Schema wie von <code>scripts/run_failover.py</code> erzeugt) direkt hochladen.</p>
       <label class="field-label">API-Token</label>
@@ -109,7 +178,7 @@
       <button id="upload-btn" class="btn-primary">Hochladen</button>
       <p id="upload-status" class="muted"></p>
     </div>
-    <div class="card">
+    <div class="card local-only" hidden>
       <h3>2 · API anbinden</h3>
       <p class="muted">Für automatisierte Pushes aus eigenem Monitoring/CI, ohne manuellen Upload:</p>
       <pre class="code-block">curl -X POST http://localhost:8000/api/ingest \
@@ -129,7 +198,9 @@
 </section>
 
 <section id="overview"><div class="section-head"><div><span class="eyebrow">OPERATING MODES</span><h2>On-Prem · Cloud · Hybrid</h2></div><p>Die App präsentiert abgeleitete Ergebnisse. Rohdaten und Messung bleiben im Repository.</p></div>
-<div class="modes"><article><b>ON_PREM_ONLY</b><span>Lokale App + DB Primary</span></article><article><b>CLOUD_ONLY</b><span>Cloud App + DB Primary</span></article><article class="accent"><b>HYBRID</b><span>Primary + synchronisierte Standby-Site</span></article></div></section>
+<div class="modes"><article><b>ON_PREM_ONLY</b><span>Lokale App + DB Primary</span></article><article><b>CLOUD_ONLY</b><span>Cloud App + DB Primary</span></article><article class="accent"><b>HYBRID</b><span>Primary + synchronisierte Standby-Site</span></article></div>
+<div class="card split-note"><h3>Bewusste Trennung in diesem Lab: DB On-Prem, App Cloud/Multi-Cloud</h3><p class="muted">Datenhoheit und Compliance sprechen oft dafür, die Datenbank On-Prem zu belassen, während der zustandslose App-/Web-Layer flexibel auf einer oder mehreren Clouds skaliert. Dieses Setup emuliert genau das: die Postgres/Patroni-Knoten laufen fest lokal, die Demo-API steht stellvertretend für den frei platzierbaren App-Layer. Konfigurierbar im Abschnitt <a href="#scenario">„Szenario &amp; Last einstellen“</a>.</p></div>
+</section>
 
 <section id="evidence"><div class="section-head"><div><span class="eyebrow">MEASURED</span><h2>Failover Evidence</h2></div><span class="pill">RTO je Run</span></div>
 <div class="card simulation-card local-only" hidden>

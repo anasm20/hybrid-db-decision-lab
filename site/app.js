@@ -97,8 +97,8 @@ async function refresh() {
     ? costEntries.map(([k, v]) => `<div class="kpi"><small>${labels[k] || k}</small><strong>€ ${Number(v).toLocaleString('de-AT', { maximumFractionDigits: 0 })}</strong><span>/ Monat · MODELLED</span></div>`).join('')
     : '<p class="muted">Run analysis/cost_model.py</p>';
 
-  // RTO by run chart
-  const runs = (summary.runs || []).filter(x => x.rto_seconds != null);
+  // RTO by run chart — MEASURED evidence only, never mixed with SIMULATED demo runs.
+  const runs = (summary.runs || []).filter(x => x.rto_seconds != null && x.provenance === 'MEASURED');
   const maxRto = Math.max(1, ...runs.map(x => x.rto_seconds));
   document.querySelector('#chart').innerHTML = runs.length
     ? runs.map((r, i) => `<div class="bar-wrap" title="${r.experiment_id}: ${fmt(r.rto_seconds, 2)}s"><div class="bar" style="height:${Math.max(4, r.rto_seconds / maxRto * 180)}px"></div><span class="bar-label">${i + 1}</span></div>`).join('')
@@ -107,14 +107,59 @@ async function refresh() {
   // Recent runs table — every test result, newest first.
   const tbody = document.querySelector('#runs-table-body');
   const allRuns = [...(summary.runs || [])].sort((a, b) => new Date(b.finished_at || 0) - new Date(a.finished_at || 0));
+  const rtoGate = gates.rto_seconds_max ?? Infinity;
+  const lossGate = gates.acknowledged_write_loss_max ?? 0;
+
+  function verdict(r) {
+    const w = r.workload || {};
+    if (r.rto_seconds == null) return { label: 'k. A.', cls: 'verdict-unknown' };
+    if (r.rto_seconds > rtoGate || (r.acknowledged_write_loss ?? 0) > lossGate) {
+      return { label: 'Schlecht', cls: 'verdict-bad' };
+    }
+    if ((w.error_rate ?? 0) >= 0.05 || (w.p95_ms ?? 0) >= 500) {
+      return { label: 'Achtung', cls: 'verdict-warn' };
+    }
+    return { label: 'Gut', cls: 'verdict-good' };
+  }
+
+  const SCENARIO_LABELS = {
+    'primary-failure': 'Primary-Failover (kontrolliert)',
+    'primary-failover-demo': 'Failover-Demo (simuliert)',
+    'external': 'Externe Messung',
+  };
+
+  const SERVER_MODEL_LABELS = { small: 'Klein (1 vCPU/1GB)', medium: 'Mittel (2 vCPU/2GB)', large: 'Groß (4 vCPU/4GB)' };
+
+  function scenarioText(r) {
+    const base = SCENARIO_LABELS[r.scenario] || r.scenario || 'Unbekanntes Szenario';
+    const parts = [base];
+    if (r.initial_primary && r.promoted_primary) {
+      parts.push(`${r.initial_primary} → ${r.promoted_primary}`);
+    } else if (r.initial_primary) {
+      parts.push(`Knoten ausgefallen: ${r.initial_primary}`);
+    }
+    const topo = r.topology;
+    if (topo?.server_model) parts.push(`DB-Server: ${SERVER_MODEL_LABELS[topo.server_model] || topo.server_model}`);
+    if (topo?.app_hosting?.length) parts.push(`App: ${topo.app_hosting.join(' + ').toUpperCase()}`);
+    else if (topo) parts.push('App: On-Prem');
+    const vus = r.load?.vus;
+    const rps = r.workload?.throughput_rps;
+    if (vus != null) parts.push(`${vus} gleichzeitige Nutzer`);
+    else if (rps != null) parts.push(`Last: ${fmt(rps, 1)} req/s`);
+    return parts.join(' · ');
+  }
+
   tbody.innerHTML = allRuns.length
     ? allRuns.slice(0, 20).map(r => {
       const w = r.workload || {};
       const prov = r.provenance === 'MEASURED' ? 'prov-measured' : 'prov-simulated';
       const when = r.finished_at ? new Date(r.finished_at).toLocaleString('de-AT') : '—';
+      const v = verdict(r);
       return `<tr>
+        <td><span class="verdict-tag ${v.cls}">${v.label}</span></td>
         <td>${r.experiment_id}</td>
         <td><span class="prov-tag ${prov}">${r.provenance || '—'}</span></td>
+        <td class="scenario-cell">${scenarioText(r)}</td>
         <td>${fmt(r.rto_seconds, 2)} s</td>
         <td>${r.acknowledged_write_loss ?? '—'}</td>
         <td>${fmt(w.p95_ms, 0)} / ${fmt(w.p99_ms, 0)} ms</td>
@@ -122,7 +167,7 @@ async function refresh() {
         <td>${when}</td>
       </tr>`;
     }).join('')
-    : '<tr><td colspan="7" class="muted">Noch keine Runs.</td></tr>';
+    : '<tr><td colspan="9" class="muted">Noch keine Runs.</td></tr>';
 }
 
 refresh();
@@ -212,6 +257,96 @@ async function pollLiveEvents() {
 }
 pollLiveEvents();
 setInterval(pollLiveEvents, 2000);
+
+// --- Scenario configurator: pure client-side command generator, works everywhere
+// (including static GitHub Pages) since it never calls the backend directly. ---
+const scModel = document.querySelector('#sc-model');
+const scVus = document.querySelector('#sc-vus');
+const scDuration = document.querySelector('#sc-duration');
+const scClouds = document.querySelectorAll('.sc-cloud');
+const scCommand = document.querySelector('#sc-command');
+const scCopyBtn = document.querySelector('#sc-copy');
+const scCopyStatus = document.querySelector('#sc-copy-status');
+
+function buildScenarioCommand() {
+  if (!scModel) return;
+  const model = scModel.value;
+  const vus = Math.max(1, parseInt(scVus.value, 10) || 25);
+  const duration = scDuration.value;
+  const clouds = Array.from(scClouds).filter(c => c.checked).map(c => c.value);
+  const appHosting = clouds.length ? clouds.join(',') : 'on-prem';
+  const cmd = [
+    `python scripts/new_experiment.py --scenario primary-failure --repetitions 1 \\`,
+    `  --vus ${vus} --duration ${duration} --server-model ${model} --app-hosting ${appHosting}`,
+    ``,
+    `# Run-ID aus der Ausgabe oben übernehmen:`,
+    `python scripts/run_failover.py --run-id <RUN-ID> \\`,
+    `  --vus ${vus} --duration ${duration} --server-model ${model} --app-hosting ${appHosting}`,
+    ``,
+    `python analysis/analyze.py   # aktualisiert die Kennzahlen oben`,
+  ].join('\n');
+  scCommand.textContent = cmd;
+  return cmd;
+}
+
+if (scModel) {
+  [scModel, scVus, scDuration, ...scClouds].forEach(el => el.addEventListener('input', buildScenarioCommand));
+  buildScenarioCommand();
+  scCopyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(scCommand.textContent);
+      scCopyStatus.textContent = 'Kopiert.';
+    } catch (e) {
+      scCopyStatus.textContent = 'Kopieren nicht möglich — bitte manuell markieren.';
+    }
+    setTimeout(() => { scCopyStatus.textContent = ''; }, 3000);
+  });
+}
+
+// --- Run the scenario directly via the dashboard's sibling-container runner. ---
+const scToken = document.querySelector('#sc-token');
+const scRunBtn = document.querySelector('#sc-run');
+const scRunStatus = document.querySelector('#sc-run-status');
+
+if (scToken) {
+  try { scToken.value = localStorage.getItem('dashboard_api_token') || ''; } catch (e) {}
+  scToken.addEventListener('change', () => {
+    try { localStorage.setItem('dashboard_api_token', scToken.value); } catch (e) {}
+    if (tokenInput) tokenInput.value = scToken.value;
+  });
+}
+
+if (scRunBtn) {
+  scRunBtn.addEventListener('click', async () => {
+    const token = scToken.value.trim();
+    if (!token) { scRunStatus.textContent = 'Bitte API-Token eingeben.'; return; }
+    const clouds = Array.from(scClouds).filter(c => c.checked).map(c => c.value);
+    scRunBtn.disabled = true;
+    scRunStatus.textContent = 'Wird gestartet…';
+    try {
+      const r = await fetch('/api/run-scenario', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          server_model: scModel.value,
+          vus: Math.max(1, parseInt(scVus.value, 10) || 25),
+          duration: scDuration.value,
+          app_hosting: clouds,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+      scRunStatus.textContent = `Gestartet: ${data.run_id} — Fortschritt siehe Live-Panel oben.`;
+      document.querySelector('#live-run-panel')?.scrollIntoView({ behavior: 'smooth' });
+      liveRunSinceEpoch = 0;
+      pollLiveEvents();
+    } catch (e) {
+      scRunStatus.textContent = `Fehler: ${e.message}`;
+    } finally {
+      scRunBtn.disabled = false;
+    }
+  });
+}
 
 // --- Upload real evidence ---
 const tokenInput = document.querySelector('#api-token');
