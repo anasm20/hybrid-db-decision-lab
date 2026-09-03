@@ -103,6 +103,26 @@ async function refresh() {
   document.querySelector('#chart').innerHTML = runs.length
     ? runs.map((r, i) => `<div class="bar-wrap" title="${r.experiment_id}: ${fmt(r.rto_seconds, 2)}s"><div class="bar" style="height:${Math.max(4, r.rto_seconds / maxRto * 180)}px"></div><span class="bar-label">${i + 1}</span></div>`).join('')
     : '<p class="muted">Noch keine MEASURED Runs. Führe scripts/run_failover.py aus und starte die Analyse.</p>';
+
+  // Recent runs table — every test result, newest first.
+  const tbody = document.querySelector('#runs-table-body');
+  const allRuns = [...(summary.runs || [])].sort((a, b) => new Date(b.finished_at || 0) - new Date(a.finished_at || 0));
+  tbody.innerHTML = allRuns.length
+    ? allRuns.slice(0, 20).map(r => {
+      const w = r.workload || {};
+      const prov = r.provenance === 'MEASURED' ? 'prov-measured' : 'prov-simulated';
+      const when = r.finished_at ? new Date(r.finished_at).toLocaleString('de-AT') : '—';
+      return `<tr>
+        <td>${r.experiment_id}</td>
+        <td><span class="prov-tag ${prov}">${r.provenance || '—'}</span></td>
+        <td>${fmt(r.rto_seconds, 2)} s</td>
+        <td>${r.acknowledged_write_loss ?? '—'}</td>
+        <td>${fmt(w.p95_ms, 0)} / ${fmt(w.p99_ms, 0)} ms</td>
+        <td>${w.error_rate != null ? fmt(w.error_rate * 100, 2) + '%' : '—'}</td>
+        <td>${when}</td>
+      </tr>`;
+    }).join('')
+    : '<tr><td colspan="7" class="muted">Noch keine Runs.</td></tr>';
 }
 
 refresh();
@@ -127,6 +147,71 @@ async function detectLocalApi() {
   }
 }
 detectLocalApi();
+
+// --- Live run panel: while scripts/run_failover.py is executing, its events are
+// pushed to /api/events in real time. Poll frequently and show them as a timeline. ---
+const EVENT_LABELS = {
+  experiment_started: 'Test gestartet',
+  failure_injected: 'Primary getötet',
+  new_primary_detected: 'Neuer Primary erkannt',
+  service_write_recovered: 'Schreibzugriff wiederhergestellt',
+  recovery_timeout: 'Timeout — keine Wiederherstellung',
+  experiment_completed: 'Test abgeschlossen',
+};
+let liveRunId = null;
+let liveRunSinceEpoch = 0;
+let liveRunStartedEpoch = null;
+let liveRunHideTimer = null;
+
+function renderLiveEvent(row) {
+  const label = EVENT_LABELS[row.event] || row.event;
+  const el = document.createElement('div');
+  el.className = 'ev';
+  el.innerHTML = `<b>${new Date(row.epoch * 1000).toLocaleTimeString('de-AT')}</b><span>${label}</span>`;
+  document.querySelector('#live-run-timeline').appendChild(el);
+  document.querySelector('#live-run-timeline').scrollLeft = 1e9;
+}
+
+async function pollLiveEvents() {
+  try {
+    const url = liveRunId ? `/api/events?run_id=${encodeURIComponent(liveRunId)}&since_epoch=${liveRunSinceEpoch}` : '/api/events';
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    const panel = document.querySelector('#live-run-panel');
+
+    if (!liveRunId && data.active_run_ids && data.active_run_ids.length) {
+      liveRunId = data.active_run_ids[0];
+      liveRunSinceEpoch = 0;
+      liveRunStartedEpoch = null;
+      document.querySelector('#live-run-timeline').innerHTML = '';
+      document.querySelector('#live-run-id').textContent = liveRunId;
+      panel.hidden = false;
+      if (liveRunHideTimer) { clearTimeout(liveRunHideTimer); liveRunHideTimer = null; }
+      return pollLiveEvents();
+    }
+
+    if (liveRunId) {
+      (data.events || []).forEach(row => {
+        if (row.run_id !== liveRunId) return;
+        if (liveRunStartedEpoch == null) liveRunStartedEpoch = row.epoch;
+        renderLiveEvent(row);
+        liveRunSinceEpoch = Math.max(liveRunSinceEpoch, row.epoch);
+        if (row.event === 'experiment_completed' || row.event === 'recovery_timeout') {
+          refresh();
+          liveRunHideTimer = setTimeout(() => { panel.hidden = true; liveRunId = null; }, 6000);
+        }
+      });
+      if (liveRunStartedEpoch != null) {
+        document.querySelector('#live-run-elapsed').textContent = `${Math.max(0, Math.round(Date.now() / 1000 - liveRunStartedEpoch))}s seit Start`;
+      }
+    }
+  } catch (e) {
+    // dashboard-api not reachable (e.g. static hosting) — live panel simply stays hidden
+  }
+}
+pollLiveEvents();
+setInterval(pollLiveEvents, 2000);
 
 // --- Upload real evidence ---
 const tokenInput = document.querySelector('#api-token');

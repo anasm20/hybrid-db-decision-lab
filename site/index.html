@@ -7,7 +7,7 @@
 </head>
 <body>
 <header><div><span class="eyebrow">ARCHITECTURE EVALUATION PoC</span><h1>Hybrid Database Decision Lab</h1><p>Messbare Performance, Resilienz und Kosten vor der Technologieentscheidung.</p></div><div class="badge">Evidence-first</div></header>
-<nav><a href="#kpis">Kennzahlen</a><a href="#connect">Daten verbinden</a><a href="#overview">Übersicht</a><a href="#evidence">Evidence</a><a href="#method">Methodik</a><a href="#decision">Entscheidung</a><span class="nav-spacer"></span><span id="live-status" class="pill live-pill">live</span></nav>
+<nav><a href="#kpis">Kennzahlen</a><a href="#recent-runs">Runs</a><a href="#connect">Daten verbinden</a><a href="#overview">Übersicht</a><a href="#evidence">Evidence</a><a href="#method">Methodik</a><a href="#decision">Entscheidung</a><span class="nav-spacer"></span><span id="live-status" class="pill live-pill">live</span></nav>
 <div id="static-banner" class="static-banner">📄 Statische Ansicht (z. B. GitHub Pages) — Kennzahlen sind vorab berechnete Snapshots aus dem Repository. Live-Dashboards, Datei-Upload und API-Anbindung sind nur in der lokalen Docker-Umgebung verfügbar: Repo klonen und <code>docker compose up -d --build</code> ausführen.</div>
 <div class="quicklinks local-only" hidden>
   <a class="qlink" href="http://localhost:8080/docs" target="_blank" rel="noopener"><span class="qdot" style="background:#2563eb"></span>Demo API</a>
@@ -16,6 +16,16 @@
   <a class="qlink" href="http://localhost:8404/stats" target="_blank" rel="noopener"><span class="qdot" style="background:#16a34a"></span>HAProxy Stats</a>
   <a class="qlink" href="http://localhost:8008/patroni" target="_blank" rel="noopener"><span class="qdot" style="background:#7c3aed"></span>Patroni 1</a>
   <a class="qlink" href="http://localhost:8009/patroni" target="_blank" rel="noopener"><span class="qdot" style="background:#7c3aed"></span>Patroni 2</a>
+</div>
+<div id="live-run-panel" class="live-run-panel" hidden>
+  <div class="live-run-head">
+    <span class="live-run-dot"></span>
+    <div>
+      <strong>Failover-Test läuft: <span id="live-run-id">—</span></strong>
+      <span class="muted" id="live-run-elapsed">0s seit Start</span>
+    </div>
+  </div>
+  <div id="live-run-timeline" class="live-run-timeline"></div>
 </div>
 <main>
 
@@ -74,6 +84,16 @@
       <div id="cost-mini" class="cost-mini"></div>
     </article>
 
+  </div>
+</section>
+
+<section id="recent-runs">
+  <div class="section-head"><div><span class="eyebrow">ALLE TESTERGEBNISSE</span><h2>Letzte Runs</h2></div><span class="pill">aktualisiert alle 5s</span></div>
+  <div class="card table-card">
+    <table id="runs-table" class="runs-table">
+      <thead><tr><th>Run-ID</th><th>Provenienz</th><th>RTO</th><th>Verlorene Writes</th><th>p95 / p99</th><th>Fehlerrate</th><th>Zeitpunkt</th></tr></thead>
+      <tbody id="runs-table-body"><tr><td colspan="7" class="muted">Noch keine Runs.</td></tr></tbody>
+    </table>
   </div>
 </section>
 

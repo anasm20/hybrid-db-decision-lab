@@ -9,6 +9,18 @@ ROOT=Path(__file__).resolve().parents[1]
 PATRONI={"postgres1":"http://localhost:8008/patroni","postgres2":"http://localhost:8009/patroni"}
 API="http://localhost:8080"
 
+def load_dotenv(path):
+    if not path.exists(): return
+    for line in path.read_text().splitlines():
+        line=line.strip()
+        if not line or line.startswith('#') or '=' not in line: continue
+        k,v=line.split('=',1)
+        os.environ.setdefault(k.strip(),v.strip())
+load_dotenv(ROOT/'.env')
+
+DASHBOARD_URL=os.getenv('DASHBOARD_URL','http://localhost:8000')
+DASHBOARD_TOKEN=os.getenv('DASHBOARD_API_TOKEN','')
+
 def now(): return datetime.now(timezone.utc).isoformat()
 
 def get_json(url, timeout=2):
@@ -17,6 +29,18 @@ def get_json(url, timeout=2):
 def post(url):
     req=Request(url,method='POST',data=b'{}',headers={'Content-Type':'application/json'})
     with urlopen(req,timeout=2) as r: return json.loads(r.read().decode())
+
+def post_json(url, payload, token=None, timeout=1.5):
+    headers={'Content-Type':'application/json'}
+    if token: headers['Authorization']=f'Bearer {token}'
+    req=Request(url,method='POST',data=json.dumps(payload).encode(),headers=headers)
+    with urlopen(req,timeout=timeout) as r: return json.loads(r.read().decode())
+
+def push_live_event(run_id, row):
+    # Best-effort: the live dashboard panel is a convenience, never block the experiment on it.
+    if not DASHBOARD_TOKEN: return
+    try: post_json(f'{DASHBOARD_URL}/api/events', {**row, 'run_id':run_id}, token=DASHBOARD_TOKEN)
+    except Exception: pass
 
 def leader():
     for name,url in PATRONI.items():
@@ -60,6 +84,7 @@ if not (exp/'protocol.yaml').exists(): raise SystemExit('protocol.yaml missing: 
 events=[]
 def event(kind,**kw):
     row={"at":now(),"epoch":time.time(),"event":kind,**kw}; events.append(row); print(row)
+    push_live_event(a.run_id,row)
 
 primary=leader()
 if not primary: raise SystemExit('No Patroni leader detected. Start docker compose first.')
@@ -129,6 +154,7 @@ result={
 }
 (raw/'events.json').write_text(json.dumps(events,indent=2),encoding='utf-8')
 (raw/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+event('experiment_completed',result=result)
 # Restart failed node and leave it to rejoin as replica.
 subprocess.run(['docker','compose','start',primary],cwd=ROOT,check=False)
 k6.wait(timeout=180)

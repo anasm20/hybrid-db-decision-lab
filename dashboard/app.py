@@ -4,6 +4,7 @@ import os
 import re
 import secrets
 import subprocess
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,7 +20,15 @@ SITE = ROOT / "site"
 API_TOKEN = os.getenv("DASHBOARD_API_TOKEN", "")
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
+# Terminal event kinds that mark a run as no longer active/live.
+TERMINAL_EVENTS = {"service_write_recovered", "recovery_timeout", "experiment_completed"}
+MAX_EVENTS = 2000
+
 app = FastAPI(title="Decision Lab Dashboard")
+
+_events_lock = threading.Lock()
+EVENTS: list[dict] = []
+ACTIVE_RUNS: dict[str, dict] = {}
 
 
 def require_token(authorization: Optional[str]):
@@ -112,10 +121,53 @@ async def upload(file: UploadFile = File(...), authorization: Optional[str] = He
     return {"stored": True, "experiment_id": stored["experiment_id"]}
 
 
+class RunEvent(BaseModel):
+    run_id: str
+    event: str
+    at: Optional[str] = None
+    epoch: Optional[float] = None
+
+    class Config:
+        extra = "allow"
+
+
+@app.post("/api/events")
+def push_event(payload: RunEvent, authorization: Optional[str] = Header(None)):
+    require_token(authorization)
+    if not SAFE_ID.match(payload.run_id):
+        raise HTTPException(400, "run_id must match ^[A-Za-z0-9_.-]{1,80}$")
+    row = payload.dict(exclude_none=True)
+    row.setdefault("at", datetime.now(timezone.utc).isoformat())
+    row.setdefault("epoch", time.time())
+    with _events_lock:
+        EVENTS.append(row)
+        if len(EVENTS) > MAX_EVENTS:
+            del EVENTS[: len(EVENTS) - MAX_EVENTS]
+        if row["event"] == "experiment_started":
+            ACTIVE_RUNS[payload.run_id] = {"started_epoch": row["epoch"]}
+        elif row["event"] in TERMINAL_EVENTS:
+            ACTIVE_RUNS.pop(payload.run_id, None)
+    return {"stored": True}
+
+
+@app.get("/api/events")
+def get_events(run_id: Optional[str] = None, since_epoch: Optional[float] = None):
+    with _events_lock:
+        rows = list(EVENTS)
+        active = list(ACTIVE_RUNS.keys())
+    if run_id:
+        rows = [r for r in rows if r.get("run_id") == run_id]
+    if since_epoch is not None:
+        rows = [r for r in rows if r.get("epoch", 0) > since_epoch]
+    return {"active_run_ids": active, "events": rows[-500:]}
+
+
 @app.get("/api/status")
 def status():
     count = len([p for p in EXPERIMENTS.glob("*") if (p / "raw" / "result.json").exists()]) if EXPERIMENTS.exists() else 0
-    return {"token_configured": bool(API_TOKEN), "experiment_count": count}
+    with _events_lock:
+        active = list(ACTIVE_RUNS.keys())
+    return {"token_configured": bool(API_TOKEN), "experiment_count": count, "active_run_ids": active}
 
 
 @app.post("/api/simulate")
