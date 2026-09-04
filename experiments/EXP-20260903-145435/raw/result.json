@@ -1,0 +1,25 @@
+{
+  "experiment_id": "EXP-20260903-145435",
+  "provenance": "MEASURED",
+  "scenario": "primary-failure",
+  "initial_primary": "postgres2",
+  "promoted_primary": "postgres1",
+  "rto_seconds": 22.2736976146698,
+  "last_acknowledged_probe": 1788447276804,
+  "max_probe_after_recovery": 1788447358877,
+  "acknowledged_write_loss": 0,
+  "replication_lag_seconds_max": 0.009216,
+  "started_at": "2026-09-03T14:54:36.573514+00:00",
+  "finished_at": "2026-09-03T14:55:59.990039+00:00",
+  "topology": {
+    "database_site": "on-prem",
+    "app_hosting": [
+      "oci"
+    ],
+    "server_model": "medium"
+  },
+  "load": {
+    "vus": 25,
+    "duration": "3m"
+  }
+}
