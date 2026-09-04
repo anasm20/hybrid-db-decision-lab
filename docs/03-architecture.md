@@ -6,7 +6,7 @@
                        k6 / pgbench
                             |
                             v
-                       Demo API
+                        Demo API
                             |
                             v
                          HAProxy

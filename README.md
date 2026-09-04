@@ -17,7 +17,7 @@ The lab separates four layers:
                    k6 / pgbench
                         |
                         v
-                  Demo API
+                   Demo API
                         |
                         v
                      HAProxy
